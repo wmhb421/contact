@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Contacts</title>
+    <link rel="stylesheet" href="element.css">
+</head>
+<body>
+<div id="app" style="width: 80%; margin: 0 auto">
+    <h2>Contacts</h2>
+
+    <el-row>
+        <el-col :span="6" style="margin-bottom: 10px">
+            <el-button type="primary" @click="add">Add</el-button>
+            <el-input v-model="name" style="width: 70%" @keyup.enter.native="loadTable(1)"></el-input>
+        </el-col>
+        <el-col :span="8" style="text-align: right;">
+            <el-button type="success" @click="importExcel()">Import</el-button>
+            <el-button type="warning" @click="downloadfile();">Export</el-button>
+        </el-col>
+    </el-row>
+
+    <el-table
+            :data="page.content"
+            height="550"
+            border
+            style="width: 100%">
+        <el-table-column
+                prop="name"
+                label="UserName"
+                width="120">
+        </el-table-column>
+        <el-table-column
+                prop="phone"
+                label="PhoneNumber">
+        </el-table-column>
+        <el-table-column
+                prop="address"
+                label="Address"
+                width="140">
+        </el-table-column>
+        <el-table-column
+                prop="email"
+                label="Email">
+        </el-table-column>
+        <el-table-column
+                prop="account"
+                label="Account">
+        </el-table-column>
+        <el-table-column
+                prop="bookmarked"
+                label="Bookmark"
+                width="100">
+            <template slot-scope="scope">
+                <el-tag :type="scope.row.bookmarked ? 'success' : 'info'">
+                    {{ scope.row.bookmarked ? 'Imp' : 'NotB' }}
+                </el-tag>
+            </template>
+        </el-table-column>
+        <el-table-column
+                prop="right"
+                label="Actions"
+                width="200">
+            <template slot-scope="scope">
+                <el-button type="primary" icon="el-icon-edit" circle @click="edit(scope.row)"></el-button>
+                <el-button type="danger" icon="el-icon-delete" circle @click="del(scope.row.id)"></el-button>
+                <el-button type="warning" icon="el-icon-star-off" circle @click="bookmarkContact(scope.row.id)"></el-button>
+            </template>
+        </el-table-column>
+    </el-table>
+    <el-row type="flex" justify="center" style="margin-top: 10px">
+        <el-pagination
+                layout="prev, pager, next"
+                :page-size="pageSize"
+                :current-page="pageNum"
+                @prev-click="loadTable"
+                @current-change="loadTable"
+                @next-click="loadTable"
+                :total="page.totalElements">
+        </el-pagination>
+    </el-row>
+
+    <el-dialog
+            title="Import Excel"
+            :visible.sync="importDialogVisible"
+            width="30%">
+        <div>
+            <form action="/user/uploadFile"
+                  enctype="multipart/form-data" method="post">
+                file <input type="file" name="file" id="file" onchange='$("#fileName").val(encodeURI($("#file").val()));'>
+                <input type="hidden" value="" id="fileName" name="fileName" >
+                <br><br>
+                <input type="submit" value="submit">
+            </form>
+        </div>
+        <span slot="footer" class="dialog-footer">
+            <el-button @click="importDialogVisible = false">Cancel</el-button>
+        </span>
+    </el-dialog>
+
+    <el-dialog
+            title="Information"
+            :visible.sync="dialogVisible"
+            width="30%">
+        <el-form ref="form" :model="form" label-width="80px">
+            <el-form-item label="Name">
+                <el-input v-model="form.name"></el-input>
+            </el-form-item>
+            <el-form-item label="Phone">
+                <el-input v-model="form.phone"></el-input>
+            </el-form-item>
+            <el-form-item label="Address">
+                <el-input v-model="form.address"></el-input>
+            </el-form-item>
+            <el-form-item label="Email">
+                <el-input v-model="form.email"></el-input>
+            </el-form-item>
+            <el-form-item label="Account">
+                <el-input v-model="form.account"></el-input>
+            </el-form-item>
+        </el-form>
+        <span slot="footer" class="dialog-footer">
+            <el-button @click="dialogVisible = false">Cancel</el-button>
+            <el-button type="primary" @click="save">Confirm</el-button>
+        </span>
+    </el-dialog>
+</div>
+
+<!-- 文件上传表单 -->
+<div v-if="showImportForm">
+    <hr>
+    <h1>import excel</h1>
+    <form action="/uploadFile"
+          enctype="multipart/form-data" method="post">
+        file <input type="file" name="file" id="file" onchange='$("#fileName").val(encodeURI($("#file").val()));'>
+        <input type="hidden" value="" id="fileName" name="fileName" >
+        <br><br>
+        <input type="submit" value="submit">
+    </form>
+    <hr>
+</div>
+
+<script src="jquery.min.js"></script>
+<script src="vue.js"></script>
+<script src="element.js"></script>
+
+<script>
+    new Vue({
+        el: '#app',
+        data: {
+            page: {content:[]},
+            name: '',
+            pageNum: 1,
+            pageSize: 20,
+            dialogVisible: false,
+            importDialogVisible: false, // 控制导入Excel的模态框显示
+            form: {id:null},
+            showImportForm: false, // 控制文件上传表单的显示
+        },
+        created() {
+            this.loadTable(this.pageNum);
+        },
+        methods: {
+            loadTable(num) {
+                this.pageNum = num;
+                $.get("/user/page?pageNum=" + this.pageNum + "&pageSize=" + this.pageSize + "&name=" + this.name).then(res => {
+                    this.page = res.data;
+                });
+            },
+            add() {
+                this.dialogVisible = true;
+                this.form = {id:null};
+            },
+            edit(row) {
+                this.form = Object.assign({}, row);
+                this.dialogVisible = true;
+            },
+            save() {
+                let data = JSON.stringify(this.form);
+                if (this.form.id) {
+                    // update
+                    $.ajax({
+                        url: '/user',
+                        type: 'put',
+                        contentType: 'application/json',
+                        data: data
+                    }).then(res => {
+                        this.dialogVisible = false;
+                        this.loadTable(1);
+                    })
+                } else {
+                    // add
+                    $.ajax({
+                        url: '/user',
+                        type: 'post',
+                        contentType: 'application/json',
+                        data: data
+                    }).then(res => {
+                        this.dialogVisible = false;
+                        this.loadTable(1);
+                    })
+                }
+            },
+            del(id) {
+                $.ajax({
+                    url: '/user/' + id,
+                    type: 'delete',
+                    contentType: 'application/json'
+                }).then(res => {
+                    this.loadTable(1);
+                })
+            },
+            downloadfile() {
+                window.location.href = "/user/UserExcelDownloads";
+            },
+            bookmarkContact(id) {
+                // find
+                const contact = this.page.content.find(c => c.id === id);
+                if (contact) {
+                    contact.bookmarked = !contact.bookmarked;
+                    console.log('Bookmark status updated:', contact.bookmarked);
+                    $.ajax({
+                        url: '/user/bookmark/' + id,
+                        type: 'patch',
+                        contentType: 'application/json',
+                        data: JSON.stringify({ bookmarked: contact.bookmarked })
+                    }).then(res => {
+                        console.log('Bookmark updated on server:', res);
+                    });
+                } else {
+                    console.log('Contact not found:', id);
+                }
+            },
+            importExcel() {
+                // mobal box
+                this.importDialogVisible = true;
+            },
+            uploadFile() {
+                this.$refs.uploadForm.submit();
+            },
+            refreshContacts() {
+                this.loadTable(this.pageNum); // refresh
+            }
+        }
+    })
+</script>
+</body>
+</html>
